@@ -6,6 +6,8 @@ In this context, "Quick" can be more considered to refer to the speed at which t
 
 **Caveats:** QT is not intended to track weak, disorganized systems over their entire lifetime. For this purpose a more comprehensive, rigorous tracker is recommended, such as Tim Marchok's GFDL Vortex Tracker. As with any objective cyclone identification method QT may not correctly identify 100% of all cyclones, nor will all identified disturbances necessarily be coherent cyclones. QT may also not be quick enough.
 
+**NOTE** GFDL can only provide minimal support for this tracker.
+
 ## Compilation and installation
 
 **Requirements:** A Fortran 90 compiler and the NetCDF and UDUnits libraries are required to compile and run the tracker executable. The post-processing scripts require Python 2.6 with the NumPy and Pandas libraries. A source of NetCDF formatted input data is needed to run QT; examples include the GFDL models or the MERRA reanalysis, both of which are freely available for download.
