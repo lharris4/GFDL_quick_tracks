@@ -1,0 +1,24 @@
+##Be sure to unload incompatible libraries first
+#This WILL require updating when new libraries are available.
+module unload nco netcdf
+module load intel_compilers/18.0.5 netcdf-fortran/4.5.2
+
+
+ifort -O2 src/tracker.F90 -o bin/track.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff  -lz -limf -ludunits -lm -traceback
+
+ifort -O2 src/tracker.F90 -o bin/track_checkmissing.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff -lz -limf -ludunits -lm -traceback -DCHECK_MISSING
+
+ifort -O0 src/tracker.F90 -o bin/track_debug.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff -lz -limf -ludunits -lm -traceback -check bounds
+
+#Old compiling instructions
+
+#module load ifort
+#module load netcdf
+
+#ifort -O2 src/tracker.F90 -o bin/track.exe -L/usr/local/netcdf4/lib -L/usr/local/hdf5/lib -L/opt/intel/icc/11.1.073/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdf -lnetcdff -lhdf5 -lhdf5_hl -lz -limf -ludunits -lm -traceback
+
+#ifort -O2 src/tracker.F90 -o bin/track_checkmissing.exe -L/usr/local/netcdf4/lib -L/usr/local/hdf5/lib -L/opt/intel/icc/11.1.073/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdf -lnetcdff -lhdf5 -lhdf5_hl -lz -limf -ludunits -lm -DCHECK_MISSING -traceback
+
+#ifort -O0 src/tracker.F90 -o bin/track-debug.exe -L/usr/local/netcdf4/lib -L/usr/local/hdf5/lib -L/opt/intel/icc/11.1.073/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdf -lnetcdff -lhdf5 -lhdf5_hl -lz -limf -ludunits -lm -traceback -check bounds
+
+#ifort -O2 src/NCEP_proc.F90 -o bin/NCEP_proc -L/usr/local/netcdf4/lib -L/usr/local/hdf5/lib -L/opt/intel/icc/11.1.073/lib/intel64 -lnetcdf -lnetcdff -lhdf5 -lhdf5_hl -lz -limf -lm -traceback -check all,noarg_temp_created
