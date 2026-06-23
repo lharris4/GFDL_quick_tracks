@@ -1,14 +1,26 @@
+#!/bin/tcsh
+
 ##Be sure to unload incompatible libraries first
-#This WILL require updating when new libraries are available.
 module unload nco netcdf
-module load intel_compilers/18.0.5 netcdf-fortran/4.5.2
+module load intel-oneapi-compilers netcdf-fortran udunits
 
+#PARSE to find library and include directories
+setenv NETCDFF_LIB_PATH `echo $LD_LIBRARY_PATH | tr ':' '\n' | grep -i netcdf-fortran | head -n 1`
+setenv UDUNITS_LIB_PATH `echo $LD_LIBRARY_PATH | tr ':' '\n' | grep -i udunits | head -n 1`
 
-ifort -O2 src/tracker.F90 -o bin/track.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff  -lz -limf -ludunits -lm -traceback
+setenv NETCDFF_INC_PATH "${NETCDFF_LIB_PATH}/../include"
+setenv UDUNITS_INC_PATH "${UDUNITS_LIB_PATH}/../include"
 
-ifort -O2 src/tracker.F90 -o bin/track_checkmissing.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff -lz -limf -ludunits -lm -traceback -DCHECK_MISSING
+ifx src/tracker.F90 -o bin/track.exe \
+    -L${NETCDFF_LIB_PATH} -L${UDUNITS_LIB_PATH} \
+    -I${NETCDFF_INC_PATH} -I${UDUNITS_INC_PATH} \
+    -lnetcdff   -lz -limf -ludunits2 -lm \
+    -O2 -traceback
+#ifort -O2 src/tracker.F90 -o bin/track.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff  -lz -limf -ludunits -lm -traceback
 
-ifort -O0 src/tracker.F90 -o bin/track_debug.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff -lz -limf -ludunits -lm -traceback -check bounds
+#ifort -O2 src/tracker.F90 -o bin/track_checkmissing.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff -lz -limf -ludunits -lm -traceback -DCHECK_MISSING
+
+#ifort -O0 src/tracker.F90 -o bin/track_debug.exe -I/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/include -L/app/spack/v0.15/linux-rhel7-x86_64/gcc-4.8.5/netcdf-fortran/4.5.2-q6uugfqsoid67nalgz5wn5lh4g2ufxaf/lib -L/usr/local/intel_compilers/2018/lib/intel64 -L/usr/local/udunits-1.12.11/lib/ -I/usr/local/udunits-1.12.11/include/ -lnetcdff -lz -limf -ludunits -lm -traceback -check bounds
 
 #Old compiling instructions
 

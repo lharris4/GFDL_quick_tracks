@@ -33,8 +33,8 @@
 ! 10oct13: started cleaning up code in preparation for public release.
 
      program main
+      use iso_c_binding
       implicit         none
-
 #include <netcdf.inc>
 
       integer, parameter :: MAXSTORM = 600
@@ -280,15 +280,30 @@
 !$    integer :: omp_get_thread_num
       integer :: num_threads = 1
 
+      ! UDUNITS-2 Opaque pointer handles 
+      type(c_ptr) :: ut_sys = c_null_ptr
+      type(c_ptr) :: TIMECENTERS_UNIT = c_null_ptr
 
-      integer*8 timecenters_unit ! Pointer to udunits "unit" type
-      integer*8 timecenters_unit_avg
-      !The size of the pointer variable appears to be system-dependent. Check your
-      !udunits.inc for the exact definition (look for 'UD_POINTER')
+      interface
+         type(c_ptr) function ut_read_xml(path) bind(c, name="ut_read_xml")
+            use iso_c_binding
+            type(c_ptr), value :: path
+         end function ut_read_xml
 
-      !!! UDUNITS ROUTINES
-      !!! To get around incombatability with f77 udunits interface
-      integer, external :: utopen, utmake, utdec, utcaltime
+         type(c_ptr) function ut_parse(sys, string, encoding) bind(c, name="ut_parse")
+            use iso_c_binding
+            type(c_ptr), value :: sys
+            character(kind=c_char), intent(in) :: string(*)
+            integer(c_int), value :: encoding
+         end function ut_parse
+
+         integer(c_int) function ut_decode_time(value, year, month, day, hour, minute, second, resolution) bind(c, name="ut_decode_time")
+            use iso_c_binding
+            real(c_double), value :: value
+            integer(c_int), intent(out) :: year, month, day, hour, minute
+            real(c_double), intent(out) :: second, resolution
+         end function ut_decode_time
+      end interface
 
 #ifdef CHECK_MISSING
       print*, '**** Checking for missing values ****'
@@ -332,12 +347,12 @@
          call getarg(1,nmlfile)
       endif
 
-      !Initialize udunits; note that Fortran is limited to using udunits v1
-      if (utopen('/usr/local/udunits-1.12.11/etc/udunits.dat') /= 0) then
-         print*, 'COULD NOT OPEN UDUNITS FILE. Stop.'
+      ! Initialize udunits2 using default XML database path
+      ut_sys = ut_read_xml(c_null_ptr)
+      if (.not. c_associated(ut_sys)) then
+         print*, 'COULD NOT INITIALIZE UDUNITS-2 SYSTEM. Stop.'
          stop 150
       endif
-
 !****************************************************************************
 !
 ! Get control parameters from namelist
@@ -508,14 +523,13 @@
          ! and
          ! http://www.esrl.noaa.gov/psd/data/gridded/readgeneral.f
          ! see also http://www.unidata.ucar.edu/software/netcdf/time/recs.html
-         TIMECENTERS_UNIT = UTMAKE()
          call get_var_att_str(fid, name_time, 'units', timestring, nt == 1 .and. nfile == 1)
-         STATUS = UTDEC(trim(timestring), TIMECENTERS_UNIT)
-         if (status /= 0) then
-            print*, 'UTDEC FAILED ', status
+         TIMECENTERS_UNIT = ut_parse(ut_sys, trim(timestring)//c_null_char, 0_c_int)
+         if (.not. c_associated(TIMECENTERS_UNIT)) then
+            print*, 'UDUNITS-2 failed to parse time unit string: ', trim(timestring)
             stop 151
          endif
-
+         
          !!! Average file (just precip for now)
          if (trim(infile_avg(nfile)) /= '') then
             if (one_variable_per_file) then
@@ -571,12 +585,26 @@
             !Get hour
             time8 = real(timeval(1),8)
             if (julian_calendar_fix) time8 = time8 - 13.
-            status = UTCALTIME(time8,TIMECENTERS_UNIT,year,month,day,hour,tmin,tsec)
-            if (status /= 0) then
-               print*, 'UTCALTIME FAILED ', status
-               stop 153
-            endif
-
+            block
+               integer(c_int) :: c_yr, c_mo, c_dy, c_hr, c_mn, c_stat
+               real(c_double) :: c_sc, c_res
+               
+               ! Call the correct UDUNITS-2 function
+               c_stat = ut_decode_time(real(time8, c_double), c_yr, c_mo, c_dy, c_hr, c_mn, c_sc, c_res)
+               
+               if (c_stat /= 0) then
+                  print*, 'ut_decode_time FAILED'
+                  stop 152
+               endif
+               
+               year = int(c_yr)
+               month = int(c_mo)
+               day = int(c_dy)
+               hour = int(c_hr)
+               tmin = int(c_mn)
+               tsec = real(c_sc)
+            end block
+            
             length = len(trim(idfile))
             !Assumes name ends in .nc
             write(current_idfilename,'(2A, I4.4, 2I2.2, A)') idfile(1:length-3), '.', year, month, day, '.nc'
@@ -745,12 +773,26 @@
             !Get hour
             time8 = real(timeval(nt),8)
             if (julian_calendar_fix) time8 = time8 - 13.
-            status = UTCALTIME(time8,TIMECENTERS_UNIT,year,month,day,hour,tmin,tsec)
-            if (status /= 0) then
-               print*, 'UTCALTIME FAILED ', status
-               stop 152
-            endif
-
+            block
+               integer(c_int) :: c_yr, c_mo, c_dy, c_hr, c_mn, c_stat
+               real(c_double) :: c_sc, c_res
+               
+               ! Call the correct UDUNITS-2 function
+               c_stat = ut_decode_time(real(time8, c_double), c_yr, c_mo, c_dy, c_hr, c_mn, c_sc, c_res)
+               
+               if (c_stat /= 0) then
+                  print*, 'ut_decode_time FAILED'
+                  stop 152
+               endif
+               
+               year = int(c_yr)
+               month = int(c_mo)
+               day = int(c_dy)
+               hour = int(c_hr)
+               tmin = int(c_mn)
+               tsec = real(c_sc)
+            end block
+            
             !If after the first timestep calculate dt_hr. Since dt_hr
             !is an integer number of hours, we only need to drill down to hours.
             if (nfile > 1 .or. nt > 1 ) then
