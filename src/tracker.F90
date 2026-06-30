@@ -55,7 +55,7 @@
       integer:: ntimes, ntimes_avg
       real*4, allocatable:: lon(:,:), lat(:,:), area(:,:), lev(:), ilev(:), peln(:)
       real*4, allocatable :: timeval(:) !*4 or *8 ?
-      real*4, allocatable :: timeval_avg(:,:) 
+      real*4, allocatable :: timeval_avg(:,:)
       real*8 :: time8
       real*4, allocatable:: slp(:,:), tm(:,:), vort(:,:), wk(:,:), slp_s(:,:)
       real*4, allocatable :: zsurf(:,:), T(:,:,:), precip(:,:)
@@ -140,7 +140,7 @@
                                                        !! identified at successive times (after performing an
                                                        !! extrapolation on the position of the cyclone center at the
                                                        !! earlier time) to be combined into a track.
-      
+
       logical       :: extrap_traj = .true.            !! Whether to perform a extrapolation of cyclones using an
                                                        !! earlier timestep (instead of the steering-level winds in
                                                        !! u_steer, v_steer; steering winds are always used on the
@@ -148,7 +148,7 @@
                                                        !! estimate of where a storm center should be at the following
                                                        !! time; used in track connection process. Requires
                                                        !! extrap_adv_traj = .true.
-      
+
       logical       :: periodicx  = .true.             !! Whether domain is assumed periodic in the x direction. If
                                                        !! using a global grid or a cartesian doubly-periodic domain
                                                        !! this should be set; if the input domain is only a subset
@@ -162,9 +162,9 @@
                                                        !! and name_lon_2d; if use_grid_file = .true. it will look for this
                                                        !! file in grid_file.
 
-      logical       :: extrap_adv_traj = .true.        !! Whether to perform a extrapolation of cyclones using an earlier 
+      logical       :: extrap_adv_traj = .true.        !! Whether to perform a extrapolation of cyclones using an earlier
                                                        !! timestep; if extrap_traj = .false. then only the steering winds
-                                                       !! are used 
+                                                       !! are used
 
       logical       :: avg_adv_winds = .true.          !! ?? Need to sort out advective options
 
@@ -203,7 +203,7 @@
       real          :: max_warm_offset = 500.          !! Maximum distance warm core allowed from cyclone center, in km.
                                                        !! (Converted to meters below)
 
-      real          :: max_warm_cyrad = 880.           !! Maximum radius for warm-core contours, in km. 
+      real          :: max_warm_cyrad = 880.           !! Maximum radius for warm-core contours, in km.
                                                        !! (Converted to meters below)
 
       logical       :: julian_calendar_fix = .false.   !! Subtracts 13 days (assumes 20th/21st century) from date. This is
@@ -217,8 +217,8 @@
       logical       :: one_variable_per_file = .false. !! Option for each variable to be in its own file. Input filename must
                                                        !! have the form 'input.#.nc' (one hash) in which the variable name
                                                        !! (given by the flist variables below) replaces the hash-mark. Input
-                                                       !! files must otherwise be identical; in particular the dimids must be 
-                                                       !! the same.       
+                                                       !! files must otherwise be identical; in particular the dimids must be
+                                                       !! the same.
 
       real          :: precip_max_radius = 500.        !! Maximum radius from center for counting precipitation as part of a storm.
                                                        !! km, converted to meters below. Requires infile_avg be set.
@@ -236,23 +236,23 @@
       real          :: slpgradthresh = 0.0015 !mb/km, as per Marchok tracker
 
       logical       :: warm_core_only = .false.   !Backwards compatability, if true warm_core_check is enabled
-      
+
 
 !!!!! flist options: Names of variables in input file(s)
       character(len=40) :: name_lon = 'lon' ! Longitude dimension axis
       character(len=40) :: name_lat = 'lat' ! Latitude dimension axis
       character(len=40) :: name_lon_2D = 'grid_lont'
       character(len=40) :: name_lat_2D = 'grid_latt'
-      character(len=40) :: name_area_2D = 'area' 
+      character(len=40) :: name_area_2D = 'area'
       character(len=40) :: name_time = 'time'
       character(len=40) :: name_land_mask = 'land_mask'
       character(len=40) :: name_zsurf = 'zsurf'
       character(len=40) :: name_SLP = 'slp'
       character(len=40) :: name_TM  = 'tm'
-      character(len=40) :: name_u_ref = 'u_ref' 
-      character(len=40) :: name_v_ref = 'v_ref' 
-      character(len=40) :: name_u_steer = 'u500' 
-      character(len=40) :: name_v_steer = 'v500' 
+      character(len=40) :: name_u_ref = 'u_ref'
+      character(len=40) :: name_v_ref = 'v_ref'
+      character(len=40) :: name_u_steer = 'u500'
+      character(len=40) :: name_v_steer = 'v500'
       character(len=40) :: name_vort850 = 'vort850'
       character(len=40) :: name_precip  = 'precip'
 
@@ -280,29 +280,58 @@
 !$    integer :: omp_get_thread_num
       integer :: num_threads = 1
 
-      ! UDUNITS-2 Opaque pointer handles 
+      ! UDUNITS-2 Opaque pointer handles
       type(c_ptr) :: ut_sys = c_null_ptr
       type(c_ptr) :: TIMECENTERS_UNIT = c_null_ptr
+      type(c_ptr) :: target_unit_sec = c_null_ptr
+      type(c_ptr) :: time_converter = c_null_ptr
 
       interface
          type(c_ptr) function ut_read_xml(path) bind(c, name="ut_read_xml")
-            use iso_c_binding
-            type(c_ptr), value :: path
+           use iso_c_binding
+           type(c_ptr), value :: path
          end function ut_read_xml
 
          type(c_ptr) function ut_parse(sys, string, encoding) bind(c, name="ut_parse")
-            use iso_c_binding
-            type(c_ptr), value :: sys
-            character(kind=c_char), intent(in) :: string(*)
-            integer(c_int), value :: encoding
+           use iso_c_binding
+           type(c_ptr), value :: sys
+           character(kind=c_char), intent(in) :: string(*)
+           integer(c_int), value :: encoding
          end function ut_parse
 
-         integer(c_int) function ut_decode_time(value, year, month, day, hour, minute, second, resolution) bind(c, name="ut_decode_time")
-            use iso_c_binding
-            real(c_double), value :: value
-            integer(c_int), intent(out) :: year, month, day, hour, minute
-            real(c_double), intent(out) :: second, resolution
-         end function ut_decode_time
+         subroutine ut_decode_time(value, year, month, day, hour, minute, second, resolution) bind(c, name="ut_decode_time")
+           use iso_c_binding
+           real(c_double), value :: value
+           integer(c_int), intent(out) :: year, month, day, hour, minute
+           real(c_double), intent(out) :: second, resolution
+         end subroutine ut_decode_time
+
+         integer(c_int) function ut_get_status() bind(c, name="ut_get_status")
+           use iso_c_binding
+         end function ut_get_status
+
+         type(c_ptr) function ut_get_unit_by_name(sys, name) bind(c, name="ut_get_unit_by_name")
+           use iso_c_binding
+           type(c_ptr), value :: sys
+           character(kind=c_char), intent(in) :: name(*)
+         end function ut_get_unit_by_name
+
+         type(c_ptr) function ut_get_converter(from_unit, to_unit) bind(c, name="ut_get_converter")
+           use iso_c_binding
+           type(c_ptr), value :: from_unit, to_unit
+         end function ut_get_converter
+
+         real(c_double) function cv_convert_double(converter, value) bind(c, name="cv_convert_double")
+           use iso_c_binding
+           type(c_ptr), value :: converter
+           real(c_double), value :: value
+         end function cv_convert_double
+
+         subroutine cv_free(converter) bind(c, name="cv_free")
+           use iso_c_binding
+           type(c_ptr), value :: converter
+         end subroutine cv_free
+
       end interface
 
 #ifdef CHECK_MISSING
@@ -503,7 +532,7 @@
          endif
 
          if (trim(current_filename) == '') exit
-         write(*,'(A12, A)') 'Input file: ', trim(current_filename) 
+         write(*,'(A12, A)') 'Input file: ', trim(current_filename)
 
          if (nfile > 1) then
             call open_ncfile( current_filename, fid )
@@ -518,25 +547,29 @@
          allocate(timeval(ntimes))
          call get_var1_real ( fid, name_time, ntimes, timeval )
 
-         !Get time info
-         !Code from http://www.unidata.ucar.edu/cgi-bin/man-cgi?udunits+-s3f
-         ! and
-         ! http://www.esrl.noaa.gov/psd/data/gridded/readgeneral.f
-         ! see also http://www.unidata.ucar.edu/software/netcdf/time/recs.html
+         !Get time info (opaque and obscure)
          call get_var_att_str(fid, name_time, 'units', timestring, nt == 1 .and. nfile == 1)
          TIMECENTERS_UNIT = ut_parse(ut_sys, trim(timestring)//c_null_char, 0_c_int)
          if (.not. c_associated(TIMECENTERS_UNIT)) then
             print*, 'UDUNITS-2 failed to parse time unit string: ', trim(timestring)
             stop 151
          endif
-         
+         ! 1. Fetch the absolute reference scale for standard "second"
+         target_unit_sec = ut_get_unit_by_name(ut_sys, "second" // c_null_char)
+         ! 2. Let the library build a dynamic conversion path from TIMECENTERS_UNIT to seconds
+         time_converter = ut_get_converter(TIMECENTERS_UNIT, target_unit_sec)
+         if (.not. c_associated(time_converter)) then
+            print*, 'Could not create a conversion path for time unit string!'
+            stop 1521
+         endif
+
          !!! Average file (just precip for now)
          if (trim(infile_avg(nfile)) /= '') then
             if (one_variable_per_file) then
                call variable_file(current_avg_filename, infile_avg(nfile), name_precip)
             else
                current_avg_filename = infile_avg(nfile)
-            endif            
+            endif
             use_avg_file = .true.
             print*, ' Reading averages file ' , current_avg_filename
             call open_ncfile(current_avg_filename, fidavg )
@@ -584,19 +617,23 @@
 
             !Get hour
             time8 = real(timeval(1),8)
-            if (julian_calendar_fix) time8 = time8 - 13.
+            if (julian_calendar_fix) time8 = time8 - 13.d0
             block
-               integer(c_int) :: c_yr, c_mo, c_dy, c_hr, c_mn, c_stat
+               integer(c_int) :: c_yr, c_mo, c_dy, c_hr, c_mn
                real(c_double) :: c_sc, c_res
-               
-               ! Call the correct UDUNITS-2 function
-               c_stat = ut_decode_time(real(time8, c_double), c_yr, c_mo, c_dy, c_hr, c_mn, c_sc, c_res)
-               
-               if (c_stat /= 0) then
-                  print*, 'ut_decode_time FAILED'
+               real(c_double) :: absolute_timestamp
+
+               ! 3. Pass your raw coordinate offset value through the converter.
+               !    This automatically accounts for days, hours, or seconds dynamically.
+               absolute_timestamp = cv_convert_double(time_converter, time8)
+
+               call ut_decode_time(absolute_timestamp, c_yr, c_mo, c_dy, c_hr, c_mn, c_sc, c_res)
+
+               if (ut_get_status() /= 0) then
+                  print*, 'ut_decode_time FAILED', ut_get_status()
                   stop 152
                endif
-               
+
                year = int(c_yr)
                month = int(c_mo)
                day = int(c_dy)
@@ -604,7 +641,7 @@
                tmin = int(c_mn)
                tsec = real(c_sc)
             end block
-            
+
             length = len(trim(idfile))
             !Assumes name ends in .nc
             write(current_idfilename,'(2A, I4.4, 2I2.2, A)') idfile(1:length-3), '.', year, month, day, '.nc'
@@ -617,7 +654,7 @@
             print*, 'Creating idfile ', trim(current_idfilename)
             outtimes = 0
 
-            status = nf_def_dim(idfileid, 'lon', im, londimid) 
+            status = nf_def_dim(idfileid, 'lon', im, londimid)
             if (status .ne. NF_NOERR) call handle_err(status)
             status = nf_def_dim(idfileid, 'lat', jm, latdimid)
             if (status .ne. NF_NOERR) call handle_err(status)
@@ -646,7 +683,7 @@
          endif
 
          status = nf_inq_varid (fid, name_slp, varid)
-         
+
          if (.not. use_grid_file ) then
             allocate ( lon(im,jm) )
             allocate ( lat(im,jm) )
@@ -674,8 +711,8 @@
             allocate(precip(im,jm))
          endif
 
-         allocate ( lon_in(im) ) 
-         allocate ( lat_in(jm) ) 
+         allocate ( lon_in(im) )
+         allocate ( lat_in(jm) )
          if (latlon_grid) then
             call get_var1_real ( fid, name_lon, im, lon_in )
             call get_var1_real ( fid, name_lat, jm, lat_in )
@@ -716,7 +753,7 @@
          if (nfile == 1) then
             call pmaxmin4( 'LON', lon, im, jm, 1. )            ! lon [0,360]
             call pmaxmin4( 'LAT', lat, im, jm, 1. )            ! lat [-90,90]
-            call pmaxmin4( 'AREA (km**2)', area, im, jm, 1.e-6 )            
+            call pmaxmin4( 'AREA (km**2)', area, im, jm, 1.e-6 )
          endif
 
          if (latlon_grid) then !assuming roughly uniform grid spacing in both directions
@@ -772,19 +809,22 @@
 
             !Get hour
             time8 = real(timeval(nt),8)
-            if (julian_calendar_fix) time8 = time8 - 13.
+            if (julian_calendar_fix) time8 = time8 - 13.d0
             block
-               integer(c_int) :: c_yr, c_mo, c_dy, c_hr, c_mn, c_stat
+               integer(c_int) :: c_yr, c_mo, c_dy, c_hr, c_mn
                real(c_double) :: c_sc, c_res
-               
-               ! Call the correct UDUNITS-2 function
-               c_stat = ut_decode_time(real(time8, c_double), c_yr, c_mo, c_dy, c_hr, c_mn, c_sc, c_res)
-               
-               if (c_stat /= 0) then
-                  print*, 'ut_decode_time FAILED'
-                  stop 152
+               real(c_double) :: absolute_timestamp
+               ! 3. Pass your raw coordinate offset value through the converter.
+               !    This automatically accounts for days, hours, or seconds dynamically.
+               absolute_timestamp = cv_convert_double(time_converter, time8)
+
+               call ut_decode_time(absolute_timestamp, c_yr, c_mo, c_dy, c_hr, c_mn, c_sc, c_res)
+
+               if (ut_get_status() /= 0) then
+                  print*, 'ut_decode_time FAILED', ut_get_status()
+                  stop 153
                endif
-               
+
                year = int(c_yr)
                month = int(c_mo)
                day = int(c_dy)
@@ -792,7 +832,7 @@
                tmin = int(c_mn)
                tsec = real(c_sc)
             end block
-            
+
             !If after the first timestep calculate dt_hr. Since dt_hr
             !is an integer number of hours, we only need to drill down to hours.
             if (nfile > 1 .or. nt > 1 ) then
@@ -867,9 +907,9 @@
             call get_real3( current_filename, fid, name_u_ref, im, jm, nt, u_ref, one_variable_per_file )
             call get_real3( current_filename, fid, name_v_ref, im, jm, nt, v_ref, one_variable_per_file )
 #ifdef CHECK_MISSING
-            call get_var_att_real(fid, name_u_ref, '_FillValue', u_fillvalue, nt == 1 .and. nfile == 1)              
-            call get_var_att_real(fid, name_v_ref, '_FillValue', v_fillvalue, nt == 1 .and. nfile == 1)              
-#endif               
+            call get_var_att_real(fid, name_u_ref, '_FillValue', u_fillvalue, nt == 1 .and. nfile == 1)
+            call get_var_att_real(fid, name_v_ref, '_FillValue', v_fillvalue, nt == 1 .and. nfile == 1)
+#endif
             !Check if input has 500 mb winds available. If not, then we will use
             !surface winds times a fudge factor to start the cyclone extrapolation process
             if (one_variable_per_file) then
@@ -912,13 +952,14 @@
             endif
 
             !The '.2' and '.4' enables zero-padding of integers
-            write(*,'(A, I4.4"-"I2.2"-"I2.2" "I2.2"Z")') 'ANALYZING TIME ', year, month, day, hour 
+            write(*,'(A, I4.4"-"I2.2"-"I2.2" "I2.2"Z")') 'ANALYZING TIME ', year, month, day, hour
 
 #ifdef CHECK_MISSING
             call split_smoother(im, jm, slp, slp_s, periodicx, slp_fillvalue)
 #else
             call split_smoother(im, jm, slp, slp_s, periodicx)
 #endif
+            if (debug) print*, 'Finished smoother'
             id = 0
 #ifdef CHECK_MISSING
             call find_extrema(slp_s, id, im, jm, allstorms(:,1:2), allstormval(:,3), nstorm, .true., maxSLPthreshold, ncontours, &
@@ -942,7 +983,7 @@
             do n=1,nstorm
 
                !! Chern's Method:
-               ! fine tuning the center location by assuming the sub-grid distribution around 
+               ! fine tuning the center location by assuming the sub-grid distribution around
                ! the center (i,j) is second order polynomial
                !Be sure to use the SMOOTHED vorticity since that is what is used to find extrema in the first place
                i = allstorms(n,1)
@@ -956,9 +997,9 @@
                   if (periodicx) then
                      if (max(abs(slp_s(im,j)),abs(slp_s(i+1,j)),abs(slp_s(i,j+1)),abs(slp_s(i,j-1))) < 1.e8) then
                         !Assuming domain is 360 degrees around
-                        allstormval(n,1) = lon(i,j) + & 
+                        allstormval(n,1) = lon(i,j) + &
                              0.25*(lon(i+1,j)-lon(im,j)+360.)*(slp_s(im,j)-slp_s(i+1,j))/(slp_s(im,j) - 2.*slp_s(i,j) + slp_s(i+1,j))
-                        allstormval(n,2) = lat(i,j) + & 
+                        allstormval(n,2) = lat(i,j) + &
                              0.25*(lat(i,j+1)-lat(i,j-1))*(slp_s(i,j-1)-slp_s(i,j+1))/(slp_s(i,j-1) - 2.*slp_s(i,j) + slp_s(i,j+1))
                      endif
                   else
@@ -969,9 +1010,9 @@
                else if (i == im) then
                   if (periodicx) then
                      if (max(abs(slp_s(1,j)),abs(slp_s(i-1,j)),abs(slp_s(i,j+1)),abs(slp_s(i,j-1))) < 1.e8) then
-                        allstormval(n,1) = lon(i,j) + & 
+                        allstormval(n,1) = lon(i,j) + &
                              0.25*(lon(1,j)-lon(i-1,j)+360.)*(slp_s(i-1,j)-slp_s(1,j))/(slp_s(i-1,j) - 2.*slp_s(i,j) + slp_s(1,j))
-                        allstormval(n,2) = lat(i,j) + & 
+                        allstormval(n,2) = lat(i,j) + &
                              0.25*(lat(i,j+1)-lat(i,j-1))*(slp_s(i,j-1)-slp_s(i,j+1))/(slp_s(i,j-1) - 2.*slp_s(i,j) + slp_s(i,j+1))
                      endif
                   else
@@ -981,9 +1022,9 @@
                   end if
                else
                   if (ALL(slp_s(i-1:i+1,j-1:j+1) < 1.e8)) then
-                     allstormval(n,1) = lon(i,j) + & 
+                     allstormval(n,1) = lon(i,j) + &
                           0.25*(lon(i+1,j)-lon(i-1,j))*(slp_s(i-1,j)-slp_s(i+1,j))/(slp_s(i-1,j) - 2.*slp_s(i,j) + slp_s(i+1,j))
-                     allstormval(n,2) = lat(i,j) + & 
+                     allstormval(n,2) = lat(i,j) + &
                           0.25*(lat(i,j+1)-lat(i,j-1))*(slp_s(i,j-1)-slp_s(i,j+1))/(slp_s(i,j-1) - 2.*slp_s(i,j) + slp_s(i,j+1))
                   endif
                endif
@@ -1056,7 +1097,7 @@
 #ifdef CHECK_MISSING
                         endif
 #endif
-                     else if (landtopomask_wind(i,j) ) then 
+                     else if (landtopomask_wind(i,j) ) then
 #ifdef CHECK_MISSING
                         if ( .not.( u_ref(i,j) == u_fillvalue .or. v_ref(i,j) == v_fillvalue) ) then
 #endif
@@ -1208,7 +1249,7 @@
 !!$               !!! END DEBUG CODE
             endif
 
-            !Perform storm tracking. 
+            !Perform storm tracking.
             if (nt == 1 .and. nfile == 1 .or. nstorm_m1 <= 0) then
 !$omp parallel do default(shared)
                do n=1,nstorm
@@ -1224,7 +1265,7 @@
             !! New process: two-step track connection
             !! 1. For all previous time's storms:
             !!    a. compute extrapolated track
-            !!    b. sort by minimum pressure (?) 
+            !!    b. sort by minimum pressure (?)
             !! 2. For all current time's storms:
             !!    a. again sort by minimum pressure
             !!    b. Go down the sorted list, from deepest to least-deep, of
@@ -1233,7 +1274,7 @@
 
             !WARNING does this mean we cannot parallelize? Might need to re-think this
             do n=1,nstorm
-               
+
                if (allstorms(n,4) < 0) cycle
 
                distmin = 1.1*dist_threshold
@@ -1295,7 +1336,7 @@
                               extp(1) = allstormval_m1(nprev,1) + &
                                    u_steer(i,j)/RADIUS/cos(pi/180.*allstormval_m1(nprev,2) )*dt_hr*3600.
                               extp(2) = allstormval_m1(nprev,2) + &
-                                   v_steer(i,j)/RADIUS*dt_hr*3600.                                 
+                                   v_steer(i,j)/RADIUS*dt_hr*3600.
                            endif
                            dist = great_circle_dist(extp, allstormval(n,1:2), RADIUS)
                            if (debug) print*, 'ADV DIST = ', dist, nstormtot+n, nprev, &
@@ -1346,7 +1387,7 @@
          ! 9) minimum slp
          ! 10) maximum wind
          ! 11--13) maximum precip/rain/snow rate
-         ! 14) greatest smoothed cyclonic vorticity 
+         ! 14) greatest smoothed cyclonic vorticity
          ! 15) Number of cells with blizzard conditions
          ! 16) Warm core flag
          ! 17) Storm area
@@ -1354,7 +1395,7 @@
          !Storm file I/O
          do n=1,nstorm
             if (allstorms(n,4) == -1 .and. .not. save_untracked_storms) cycle
-            write(13,'(I8, I6, 3I4, 1x, I7, 7(3x, F10.2), 3x, E8.2, 3x, I5, 3x, F8.2, F16.2)') nstormtot+n, year, month, day, hour, allstorms(n,4), allstormval(n,1:8), max(0,int(allstormval(n,9))), allstormval(n,13), allstormval(n,12)/1.e6
+            write(13,'(I8, I6, 3I4, 1x, I7, 7(3x, F10.2), 3x, E10.2, 3x, I5, 3x, F8.2, F16.2)') nstormtot+n, year, month, day, hour, allstorms(n,4), allstormval(n,1:8), max(0,int(allstormval(n,9))), allstormval(n,13), allstormval(n,12)/1.e6
             if (useregionmask) then
                write(14,trim(region_format)) nstormtot+n, regions_wind(n,:)
                write(15,trim(region_format)) nstormtot+n, regions_snow(n,:)
@@ -1414,8 +1455,8 @@
       call close_ncfile( fid )
 
       if (.not. use_grid_file) then
-         deallocate ( lon ) 
-         deallocate ( lat ) 
+         deallocate ( lon )
+         deallocate ( lat )
          deallocate ( area )
       endif
       deallocate ( timeval )
@@ -1488,7 +1529,7 @@
          do i=1,im
             udx(i,j) = 0.5*(us(i,j-1)+us(i,j))*cos( deg2rad*0.5*(lat(i,j-1)+lat(i,j)) )*dlamda
          enddo
-      enddo  
+      enddo
 
       vort = 0.    ! ignore poles (fro TC detection)
       do j=2,jm-1
@@ -1503,14 +1544,14 @@
             d_area = dlamda*cos( deg2rad*lat(i,j) )*0.5*(lat(i,j+1)-lat(i,j-1))*deg2rad
             vort(i,j) = (udx(i,j)-udx(i,j+1)-vdy(i)+vdy(i+1))/ d_area
          enddo
-      enddo  
+      enddo
 
   end subroutine compute_vort
 
 !This subroutine is not used
  subroutine locate_center_slp(found, im, jm,  slp, tm, lon, lat,  &
                               lon_b, lon_e, lat_b, lat_e, tm_c,   &
-                              i0, j0, xx, yy, maxSLPthreshold) 
+                              i0, j0, xx, yy, maxSLPthreshold)
 
     implicit none
     integer, intent(in):: im, jm
@@ -1561,7 +1602,7 @@
        lon, lat, lon_s, lon_e, lat_s, lat_e, max_rad, cint, checkgrad, gradthresh, periodicx)
 #endif
 
-    !Looking for closed contours: ie contiguous regions 
+    !Looking for closed contours: ie contiguous regions
     implicit none
     integer, intent(in) :: im, jm
     real*4,    intent(in):: field(im,jm)
@@ -1681,18 +1722,18 @@
 !!$       id = id_conf
        if (.not. errflag) then
           id = id_conf
-          
+
 
           !If the first set of flood_fills succeed, ie we found n closed contours, then we have found a storm.
           nstorm = nstorm + 1
-          
+
           storms(nstorm,1) = i
           storms(nstorm,2) = j
           stormval(nstorm) = minf
 
 
           if (debug) print*, 'STORM VERIFIED ', nstorm, i, j, minf, n
-          
+
        else
 
           if (debug) print*, 'CONTOURS ABOVE THRESHOLD, STORM NOT VERIFIED'
@@ -1703,11 +1744,11 @@
 
     enddo
     enddo
-    
+
     !second pass: fill out contours as much as possible
     !How to get flood_fill to handle already-filled areas?
     n = mincontours+1
-    do 
+    do
        stillworking = .false.
        do ns=1,nstorm
 
@@ -1752,7 +1793,7 @@
 
   recursive subroutine flood_fill(field,id,i,j,io,jo,im,jm,upvalue,lowvalue,fillvalue,norefill,errflag,numfilled, &
        lon, lat, max_rad, depth, increasing)
-    
+
     !see http://en.wikipedia.org/wiki/Flood_fill
 
     implicit none
@@ -1784,7 +1825,7 @@
     endif
 
     if (id(i,j) /= fillvalue) then
-       
+
        if (increasing) then
           if (field(i,j) >= upvalue) return
        else
@@ -1827,7 +1868,7 @@
        numfilled = numfilled + 1
 
     endif
-    
+
     !For each adjacent cell: if fill value it is already done; if another
     !nonzero value we have hit another region, an error; else call flood_fill for it\
     !Alternately, if 'refilling' (attempting to expand the fill region) always proceed
@@ -1838,7 +1879,7 @@
        if (id(1,j) /= fillvalue) then
           call flood_fill(field,id,1,j,io,jo,im,jm,upvalue,lowvalue,fillvalue,norefill,errflag,numfilled, lon, lat, max_rad, depth+1, increasing)
           if (errflag) return
-       endif       
+       endif
 
     else
 
@@ -1848,7 +1889,7 @@
        endif
 
     endif
-       
+
     if (i == 1 .and. periodicx) then
        if (id(im,j) /= fillvalue) then
           call flood_fill(field,id,im,j,io,jo,im,jm,upvalue,lowvalue,fillvalue,norefill,errflag,numfilled, lon, lat, max_rad, depth+1, increasing)
@@ -1860,12 +1901,12 @@
           if (errflag) return
        endif
     endif
-       
+
        if (id(i,j+1) /= fillvalue) then
           call flood_fill(field,id,i,j+1,io,jo,im,jm,upvalue,lowvalue,fillvalue,norefill,errflag,numfilled, lon, lat, max_rad, depth+1, increasing)
           if (errflag) return
        endif
-       
+
        if (id(i,j-1) /= fillvalue) then
           call flood_fill(field,id,i,j-1,io,jo,im,jm,upvalue,lowvalue,fillvalue,norefill,errflag,numfilled, lon, lat, max_rad, depth+1, increasing)
           if (errflag) return
@@ -2160,7 +2201,7 @@
             case('grid_yt')
                var1_name = 'lat'
             end select
-            
+
 
             if (trim(var1_name) .eq. trim(var1_name_in)) exit !If we come back around to the original name
                                                         !or can't find an altername name, give up;
@@ -2299,7 +2340,7 @@
       real*8, intent(out):: var4(im,jm,km,1)
       integer::  status, var4id
 !
-      integer:: start(4), icount(4) 
+      integer:: start(4), icount(4)
 
       start(1) = 1
       start(2) = 1
@@ -2401,7 +2442,7 @@
             call close_ncfile(ncid)
             call variable_file(fname_var, fname, var4_name)
             !print*, 'OPENING FILE ', trim(fname_var)
-            call open_ncfile(fname_var, ncid)            
+            call open_ncfile(fname_var, ncid)
          endif
       endif
 
@@ -2423,7 +2464,7 @@
       real*4:: wk4(im,jm,km,4)
       real*4, intent(out):: var4(im,jm)
       integer::  status, var4id
-      integer:: start(4), icount(4) 
+      integer:: start(4), icount(4)
       integer:: i,j
 
       start(1) = 1
@@ -2615,7 +2656,7 @@
 ! Local variables
 !
       integer irem4,irem100
-      integer mdays(12)                           ! number day of month 
+      integer mdays(12)                           ! number day of month
       data mdays /31,28,31,30,31,30,31,31,30,31,30,31/
 !
 !***********************************************************************
@@ -2628,7 +2669,7 @@
       irem100  = mod( year, 100 )
       if( irem4 == 0 .and. irem100 /= 0) mdays(2) = 29
 !
-!!$      do 
+!!$      do
 !!$         if( month > 12 ) then
 !!$            year   = year + 1
 !!$            month  = 1
@@ -2637,7 +2678,7 @@
 !!$         end if
 !!$      enddo
 !!$
-!!$      do 
+!!$      do
 !!$         if( day > mdays(month) ) then
 !!$            day    = day - mdays(month)
 !!$            month  = month + 1
@@ -2655,7 +2696,7 @@
 !!$            exit
 !!$         end if
 !!$      end do
-         
+
 
       if( hour >= 24 ) then
         day    = day + 1
@@ -2873,5 +2914,3 @@ subroutine variable_file(filename, filepattern, variable)
 end subroutine variable_file
 
 end program
-
-     
